@@ -178,7 +178,7 @@ export class Dependencies {
     return new Promise((resolve) => {
       const options = {
         headers: {
-          "User-Agent": "opencode-wakatime",
+          "User-Agent": "opencode2-wakatime",
         },
       };
 

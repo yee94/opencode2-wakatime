@@ -1,15 +1,22 @@
 #!/usr/bin/env node
 
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const pluginDir = join(homedir(), ".config", "opencode", "plugin");
+const pluginDir = join(homedir(), ".config", "opencode", "plugins");
+const legacyPlugin = join(
+  homedir(),
+  ".config",
+  "opencode",
+  "plugin",
+  "wakatime.js",
+);
 const source = join(__dirname, "..", "dist", "bundle.js");
-const target = join(pluginDir, "wakatime.js");
+const target = join(pluginDir, "opencode2-wakatime.js");
 const packageJson = join(__dirname, "..", "package.json");
 
 async function getVersion() {
@@ -19,7 +26,7 @@ async function getVersion() {
 
 async function install() {
   const version = await getVersion();
-  console.log(`Installing opencode-wakatime v${version}...\n`);
+  console.log(`Installing opencode2-wakatime v${version}...\n`);
 
   if (!existsSync(source)) {
     console.error(`Error: Built plugin not found at ${source}`);
@@ -31,7 +38,16 @@ async function install() {
   await copyFile(source, target);
   console.log(`Installed: ${target}`);
 
+  if (existsSync(legacyPlugin)) {
+    await unlink(legacyPlugin);
+    console.log(`Removed legacy OpenCode 1 drop-in: ${legacyPlugin}`);
+  }
+
   console.log("\nInstallation complete!");
+  console.log("\nPreferred install for a published package:");
+  console.log("  opencode plugin add opencode2-wakatime");
+  console.log("\nOr add it to opencode.jsonc:");
+  console.log('  "plugins": ["opencode2-wakatime"]');
   console.log("\nNext steps:");
   console.log("1. Add your WakaTime API key to ~/.wakatime.cfg:");
   console.log("   [settings]");
@@ -42,34 +58,35 @@ async function install() {
 }
 
 async function uninstall() {
-  console.log("Uninstalling opencode-wakatime...\n");
+  console.log("Uninstalling opencode2-wakatime...\n");
 
   if (!existsSync(target)) {
     console.log("Plugin not found, nothing to uninstall.");
     return;
   }
 
-  const { unlink } = await import("node:fs/promises");
   await unlink(target);
   console.log(`Removed: ${target}`);
   console.log("\nUninstall complete!");
   console.log(
-    "\nTo fully remove, also run: npm uninstall -g opencode-wakatime",
+    "\nTo fully remove, also run: npm uninstall -g opencode2-wakatime",
   );
+  console.log("Or: opencode plugin remove opencode2-wakatime");
 }
 
 function showHelp(version) {
-  console.log(`opencode-wakatime v${version}
+  console.log(`opencode2-wakatime v${version}
 
-Usage: opencode-wakatime [options]
+Usage: opencode2-wakatime [options]
 
 Options:
-  --install    Install/update the plugin to ~/.config/opencode/plugin/
+  --install    Install/update the plugin to ~/.config/opencode/plugins/
   --uninstall  Remove the plugin
   --help, -h   Show this help message
 
 Examples:
-  npm i -g opencode-wakatime && opencode-wakatime --install
+  npm i -g opencode2-wakatime && opencode2-wakatime --install
+  opencode plugin add opencode2-wakatime
 `);
 }
 

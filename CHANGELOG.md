@@ -1,3 +1,12 @@
+## [1.0.0](https://github.com/yee94/opencode2-wakatime/releases/tag/v1.0.0) (2026-09-23)
+
+OpenCode 2 package, ported from `opencode-wakatime` 1.3.9.
+
+* publish `opencode2-wakatime` for the OpenCode 2 plugin API (`Plugin.define` / `setup`)
+* track files through `tool.execute.after`, with `message.part.updated` as a fallback
+* flush heartbeats on `session.idle`, `session.deleted`, and `session.status=idle`
+* read the OpenCode version from `ctx.app.version` and the project folder from session/location
+
 ## [1.3.9](https://github.com/angristan/opencode-wakatime/compare/v1.3.8...v1.3.9) (2026-07-14)
 
 ### Bug Fixes

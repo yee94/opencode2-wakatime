@@ -1,195 +1,97 @@
-# opencode-wakatime
+# opencode2-wakatime
 
-[![npm version](https://img.shields.io/npm/v/opencode-wakatime)](https://www.npmjs.com/package/opencode-wakatime)
-[![npm downloads](https://img.shields.io/npm/dm/opencode-wakatime)](https://www.npmjs.com/package/opencode-wakatime)
-[![CI](https://github.com/angristan/opencode-wakatime/actions/workflows/workflow.yml/badge.svg)](https://github.com/angristan/opencode-wakatime/actions/workflows/workflow.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+WakaTime 插件，面向 [OpenCode 2](https://opencode.ai/v2/docs/)。统计 AI 编码活动、改动行数和耗时。
 
-WakaTime plugin for [OpenCode](https://github.com/sst/opencode) - Track your AI coding activity, lines of code, and time spent.
+OpenCode 1 请继续使用 [`opencode-wakatime`](https://www.npmjs.com/package/opencode-wakatime)。OpenCode 2 不会运行 1.x 插件函数。
 
-Inspired by [claude-code-wakatime](https://github.com/wakatime/claude-code-wakatime).
+## 功能
 
-> [!TIP]
-> Also check out [codex-wakatime](https://github.com/angristan/codex-wakatime) for OpenAI Codex CLI!
+- 自动下载和更新 wakatime-cli
+- 跟踪 `read` / `edit` / `write` / `patch` / `multiedit`，以及 OpenCode 2 的 `apply_patch`、`str_replace` 等别名
+- 上报 `--ai-line-changes`
+- 每个项目每分钟最多一次心跳
+- 会话 idle / deleted 时刷出最后一批心跳
 
-## Features
+## 前置条件
 
-- **Automatic CLI management** - Downloads and updates wakatime-cli automatically
-- **Detailed file tracking** - Tracks file reads and modifications (edit, write, patch, multiedit)
-- **AI coding metrics** - Sends `--ai-line-changes` for WakaTime AI coding analytics
-- **Rate-limited heartbeats** - 1 per minute per project to avoid API spam
-- **Session lifecycle** - Sends final heartbeat on session idle/end
-- **Batch tool support** - Tracks file operations executed via batch tool
-
-## Prerequisites
-
-### WakaTime API Key
-
-Ensure you have a WakaTime API key configured in `~/.wakatime.cfg`
-(or `$WAKATIME_HOME/.wakatime.cfg` when `WAKATIME_HOME` is set):
+在 `~/.wakatime.cfg`（或 `$WAKATIME_HOME/.wakatime.cfg`）里配置 API key：
 
 ```ini
 [settings]
 api_key = waka_your_api_key_here
 ```
 
-You can get your API key from [WakaTime Settings](https://wakatime.com/api-key).
-
-### WakaTime CLI (Optional)
-
-In case of manual install, the plugin will automatically download wakatime-cli if not found. However, you can also install it yourself:
-
-**macOS:**
+API key 从 [WakaTime Settings](https://wakatime.com/api-key) 获取。插件找不到 wakatime-cli 时会自动下载；也可以自己安装：
 
 ```bash
 brew install wakatime-cli
 ```
 
-**Other platforms:**
-Download from [WakaTime releases](https://github.com/wakatime/wakatime-cli/releases/latest).
+## 安装
 
-## Installation
+推荐用 OpenCode 自己安装包插件：
 
-### Via opencode config (recommended)
+```bash
+opencode plugin add opencode2-wakatime
+```
 
-opencode.json:
+或写进 `opencode.jsonc`：
 
-```json
+```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-wakatime"]
+  "plugins": ["opencode2-wakatime"]
 }
 ```
 
-### Manually via npm
+也可以全局安装后拷到 OpenCode 2 的插件目录：
 
 ```bash
-npm i -g opencode-wakatime
-opencode-wakatime --install
+npm i -g opencode2-wakatime
+opencode2-wakatime --install
 ```
 
-This installs the plugin to `~/.config/opencode/plugin/wakatime.js`.
+这会安装到 `~/.config/opencode/plugins/opencode2-wakatime.js`。如果还留着 OpenCode 1 的 `~/.config/opencode/plugin/wakatime.js`，`--install` 会把它删掉，避免两份插件同时心跳。
 
-To update, run the same commands again.
+## 工作方式
 
-### From source
+OpenCode 2 的插件入口是 `{ id, setup(ctx) }`，不再返回 V1 的 hook 对象。
+
+| OpenCode 1 | OpenCode 2 |
+| --- | --- |
+| `event` 里的 `message.part.updated` | `ctx.tool.hook("execute.after")`，事件流作为兜底 |
+| `chat.message` | `ctx.session.hook("prompt")` |
+| `session.idle` / `session.deleted` | `ctx.event.subscribe()` |
+| `client` + `/global/health` | `ctx.app.version` |
+| `worktree` / `project.worktree` | `ctx.session.get()` 的目录，否则 `ctx.location` |
+
+插件标识：`opencode-<client>/<version> opencode2-wakatime/<version>`。
+
+## 文件
+
+默认写在 `~/.wakatime/`。设置了 `WAKATIME_HOME` 时改到那个目录。
+
+| 文件 | 用途 |
+| --- | --- |
+| `opencode.log` | `debug=true` 时的日志 |
+| `opencode-{hash}.json` | 每个项目的上次心跳时间 |
+| `opencode-cli-state.json` | CLI 版本 |
+| `wakatime-cli-*` | 自动下载的 CLI |
+
+## 开发
 
 ```bash
-git clone https://github.com/angristan/opencode-wakatime
-cd opencode-wakatime
-npm install && npm run build
-node bin/cli.js --install
-```
-
-The plugin will be automatically loaded by OpenCode - no configuration needed.
-
-## How It Works
-
-The plugin hooks into OpenCode's event system:
-
-```mermaid
-flowchart TB
-    subgraph OpenCode["OpenCode"]
-        A[Tool Execution<br/>read, edit, write, patch, multiedit, batch] --> H1[message.part.updated]
-        B[Chat Activity] --> H2[chat.message]
-        C[Session Events<br/>idle, end] --> H3[event]
-    end
-
-    subgraph Plugin["opencode-wakatime Plugin"]
-        H1 --> P1[Extract File Changes<br/>path, additions, deletions]
-        P1 --> Q[Heartbeat Queue]
-
-        H2 -.->|triggers| P2[Process Queue]
-        Q --> P2
-        P2 --> R[Rate Limiter<br/>1 per minute per project]
-
-        H3 --> P3[Flush Final<br/>Heartbeat]
-        P3 --> R
-    end
-
-    subgraph WakaTime["WakaTime"]
-        R --> CLI[wakatime-cli]
-        CLI --> API[WakaTime API]
-        API --> D[Dashboard<br/>AI Coding Metrics]
-    end
-
-```
-
-### Hooks Used
-
-| Hook           | Purpose                                                          |
-| -------------- | ---------------------------------------------------------------- |
-| `event`        | Tracks tool completions via `message.part.updated` and session lifecycle |
-| `chat.message` | Triggers heartbeat processing on activity                        |
-
-### Tool Tracking
-
-| Tool        | Data Extracted                                    |
-| ----------- | ------------------------------------------------- |
-| `read`      | File path (from title)                            |
-| `edit`      | File path, additions, deletions (from `filediff`) |
-| `write`     | File path, new file detection                     |
-| `patch`     | File paths from output, diff count                |
-| `multiedit` | File paths and changes from each edit result      |
-| `batch`     | Tracks all child tool operations                  |
-
-### Heartbeat Data
-
-Each heartbeat includes:
-
-- **Entity**: File path being worked on
-- **Project folder**: Working directory
-- **AI line changes**: Net lines added/removed (`additions - deletions`)
-- **Category**: "ai coding"
-- **Plugin identifier**: `opencode-<client>/<version> opencode-wakatime/<version>` (e.g. `opencode-desktop/1.1.53 opencode-wakatime/1.1.4`)
-
-## Files
-
-By default, plugin files are stored in `~/.wakatime/`.
-When `WAKATIME_HOME` is set, the same files are stored in `$WAKATIME_HOME/`.
-
-| File                        | Purpose                                    |
-| --------------------------- | ------------------------------------------ |
-| `opencode.log`              | Debug logs (enabled via `debug=true` in `~/.wakatime.cfg`) |
-| `opencode-{hash}.json`      | Per-project state (last heartbeat timestamp) |
-| `opencode-cli-state.json`   | CLI version tracking                       |
-| `opencode-version-cache.json` | Cached OpenCode server version             |
-| `wakatime-cli-*`            | Auto-downloaded CLI binary                 |
-
-## Development
-
-```bash
-# Install dependencies
 npm install
-
-# Type check
 npm run typecheck
-
-# Build
+npm test
 npm run build
 ```
 
-## Troubleshooting
+## 排错
 
-### Plugin not loading
+心跳没发出去时，先确认 `~/.wakatime.cfg` 里有 API key，再跑 `wakatime-cli --version`。把配置里的 `debug` 设成 `true` 后看 `~/.wakatime/opencode.log`。
 
-1. Check your config file syntax (`opencode.jsonc`)
-2. Verify the plugin path is correct
-3. Check logs at `~/.wakatime/opencode.log`
-
-### Heartbeats not sending
-
-1. Verify API key in `~/.wakatime.cfg`
-2. Check if wakatime-cli is working: `wakatime-cli --version`
-3. Enable debug logging and check `~/.wakatime/opencode.log`
-   (or `$WAKATIME_HOME/opencode.log` when set)
-
-### CLI not downloading
-
-1. Check network connectivity
-2. Verify write permissions to `~/.wakatime/`
-   (or `$WAKATIME_HOME/` when set)
-3. Manually install: `brew install wakatime-cli`
+插件没加载时，确认配置字段是 `plugins` 而不是 OpenCode 1 的 `plugin`，然后执行 `opencode plugin list`。
 
 ## License
 

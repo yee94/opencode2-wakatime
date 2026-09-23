@@ -147,7 +147,7 @@ export function sendHeartbeats(
       "--category",
       primary.category ?? "ai coding",
       "--plugin",
-      `opencode-${client}/${opencodeVersion} opencode-wakatime/${VERSION}`,
+      `opencode-${client}/${opencodeVersion} opencode2-wakatime/${VERSION}`,
     ];
 
     if (primary.projectFolder) {
